@@ -193,7 +193,29 @@ function convert(
       }
     }
 
+    inheritStyles() {
+      const styleElements = this.rootElement.querySelectorAll('style');
+      styleElements.forEach((styleElement) => {
+        this.rootElement.removeChild(styleElement);
+      });
+
+      const inheritedStyleElements = this.rootElement.ownerDocument.querySelectorAll('style');
+      inheritedStyleElements.forEach((styleElement) => {
+        this.rootElement.appendChild(styleElement.cloneNode(true));
+      });
+    }
+
     connectedCallback() {
+      if (options.inheritStyles) {
+        const doc = this.rootElement.ownerDocument || document;
+        this.observer = new MutationObserver(() => {
+          this.inheritStyles();
+        });
+        const styleTags = doc.querySelectorAll('style');
+        styleTags.forEach((styleTag) => {
+          this.observer.observe(styleTag, { childList: true, subtree: true });
+        });
+      }
       render(this);
     }
 
@@ -202,9 +224,15 @@ function convert(
     }
 
     disconnectedCallback() {
-      const rootElement = options.useShadowDOM ? this.shadowRoot : this;
+      if (this.observer) {
+        this.observer.disconnect();
+      }
 
-      ReactDOM.unmountComponentAtNode(rootElement);
+      ReactDOM.unmountComponentAtNode(this.rootElement);
+    }
+
+    get rootElement() {
+      return options.useShadowDOM ? this.shadowRoot : this;
     }
   }
 
@@ -230,7 +258,7 @@ function register(
   tagName,
   propNames = [],
   eventMappers = {},
-  options = { useShadowDOM: true },
+  options = { useShadowDOM: true, inheritStyles: false },
 ) {
   return customElements.define(
     tagName,
